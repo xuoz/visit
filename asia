@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シルクロード弾丸周遊計画 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Custom scrollbar for timeline */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <!-- Chosen Palette: Warm Neutrals & Terracotta (Sand, Stone, Burnt Orange, Deep Blue) -->
+    <!-- Application Structure Plan: 
+         1. Dashboard View: High-level metrics (Country split, Activity vs Travel balance) to grasp the trip's pacing.
+         2. Interactive Timeline: The core navigation. A scrollable day selector that updates a detailed itinerary panel.
+         3. Logistics Hub: Critical warnings (Visa, Money) presented as distinct cards to ensure they aren't missed.
+         4. Destination Highlights: Quick summary of key sights per city.
+         Structure chosen to allow quick toggling between the "Big Picture" (Dashboard) and "Specific Logistics" (Timeline/Warnings).
+    -->
+    <!-- Visualization & Content Choices:
+         1. Country Distribution (Doughnut Chart): Goal: Show balance of the trip. Justification: Easy to see which country gets the most time.
+         2. Daily Intensity (Bar Chart): Goal: Prepare user for fatigue. Visualizes "Sightseeing" vs "Travel" hours. Justification: This is a "bullet" trip; managing energy is key.
+         3. Interactive Timeline (DOM manipulation): Goal: Explore the daily schedule without overwhelming text. Justification: Step-by-step disclosure is better than a long text wall.
+         4. Logistics Cards: Goal: Highlight critical warnings (Visa/Money). Interaction: Static but prominent.
+         CONFIRMATION: NO SVG graphics used. NO Mermaid JS used.
+    -->
+</head>
+<body class="bg-stone-100 text-stone-800 antialiased selection:bg-orange-200 selection:text-orange-900">
+
+    <!-- Navigation -->
+    <nav class="bg-stone-900 text-stone-100 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="font-bold text-xl tracking-wider">SILK ROAD 2025</div>
+                <div class="hidden md:flex space-x-8 text-sm font-medium">
+                    <button onclick="scrollToSection('dashboard')" class="hover:text-orange-400 transition-colors">ダッシュボード</button>
+                    <button onclick="scrollToSection('itinerary')" class="hover:text-orange-400 transition-colors">旅程詳細</button>
+                    <button onclick="scrollToSection('logistics')" class="hover:text-orange-400 transition-colors">重要情報</button>
+                </div>
+                <!-- Mobile Menu Button -->
+                <div class="md:hidden text-2xl cursor-pointer" onclick="toggleMobileMenu()">☰</div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-stone-800 p-4">
+            <button onclick="scrollToSection('dashboard')" class="block w-full text-left py-2 hover:text-orange-400">ダッシュボード</button>
+            <button onclick="scrollToSection('itinerary')" class="block w-full text-left py-2 hover:text-orange-400">旅程詳細</button>
+            <button onclick="scrollToSection('logistics')" class="block w-full text-left py-2 hover:text-orange-400">重要情報</button>
+        </div>
+    </nav>
+
+    <!-- Header / Hero -->
+    <header class="bg-white border-b border-stone-200">
+        <div class="max-w-6xl mx-auto px-4 py-12 text-center">
+            <div class="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-bold tracking-wide mb-4">2025.2.4 — 2.15</div>
+            <h1 class="text-3xl md:text-5xl font-extrabold text-stone-900 mb-4">5カ国周遊・弾丸トラベル計画</h1>
+            <p class="text-lg text-stone-600 max-w-2xl mx-auto leading-relaxed">
+                羽田発、中東・コーカサス（イラン・アゼルバイジャン・ジョージア）を駆け抜け、イスタンブールを経由してブダペストへ。
+                CA720便での帰国に合わせて最適化した、文明の十字路からドナウの真珠へ至る12日間。
+            </p>
+        </div>
+    </header>
+
+    <!-- Section 1: Dashboard (Stats) -->
+    <section id="dashboard" class="py-12 bg-stone-50">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-stone-800 border-l-4 border-orange-500 pl-4">旅の全体像</h2>
+                <p class="text-stone-600 mt-2 text-sm">
+                    このセクションでは、旅のバランスと強度を可視化しています。5カ国を短期間で回るため、移動と観光のバランスを把握し、体調管理に役立ててください。
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                <!-- Chart 1: Country Breakdown -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h3 class="text-lg font-semibold mb-4 text-center text-stone-700">滞在日数配分</h3>
+                    <div class="chart-container">
+                        <canvas id="countryChart"></canvas>
+                    </div>
+                    <p class="text-xs text-center text-stone-400 mt-4">前半は移動多め、中盤イスタンブールと後半ブダペストで少し落ち着く構成です。</p>
+                </div>
+                    <p class="text-xs text-center text-stone-400 mt-4">イスタンブールでの滞在が後半に集中しており、旅の終盤はリラックスできます。</p>
+                </div>
+
+                <!-- Chart 2: Intensity Meter -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h3 class="text-lg font-semibold mb-4 text-center text-stone-700">日別アクティビティ強度 (推定)</h3>
+                    <div class="chart-container">
+                        <canvas id="intensityChart"></canvas>
+                    </div>
+                    <p class="text-xs text-center text-stone-400 mt-4">青：移動負荷 / オレンジ：観光・活動。前半（Day 1-5）の移動負荷が高めです。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Interactive Itinerary -->
+    <section id="itinerary" class="py-12 bg-white border-t border-stone-200">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="mb-8 flex flex-col md:flex-row justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold text-stone-800 border-l-4 border-orange-500 pl-4">詳細スケジュール</h2>
+                    <p class="text-stone-600 mt-2 text-sm">日付を選択して、その日の詳細な動き、フライト情報、観光スポットを確認してください。</p>
+                </div>
+            </div>
+
+            <!-- Timeline Interface -->
+            <div class="flex flex-col lg:flex-row gap-8 h-auto lg:h-[600px]">
+                <!-- Day Selector (Left Column) -->
+                <div class="w-full lg:w-1/3 flex lg:flex-col overflow-x-auto lg:overflow-y-auto no-scrollbar gap-2 pb-4 lg:pb-0 border-b lg:border-b-0 lg:border-r border-stone-200 pr-0 lg:pr-4" id="day-list">
+                    <!-- Javascript will populate this -->
+                </div>
+
+                <!-- Detail View (Right Column) -->
+                <div class="w-full lg:w-2/3 bg-stone-50 rounded-xl p-6 lg:p-10 relative overflow-hidden shadow-inner border border-stone-100" id="detail-panel">
+                    <div id="detail-content" class="fade-in">
+                        <!-- Default Content -->
+                        <div class="flex flex-col items-center justify-center h-full text-stone-400">
+                            <div class="text-4xl mb-4">✈️</div>
+                            <p>左側の日程を選択して詳細を表示</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Logistics & Warnings -->
+    <section id="logistics" class="py-12 bg-stone-100 border-t border-stone-200">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-stone-800 border-l-4 border-red-500 pl-4">⚠️ 渡航重要事項 (CRITICAL)</h2>
+                <p class="text-stone-600 mt-2 text-sm">この旅を成立させるために絶対に失敗できないポイントです。出発前に必ず確認してください。</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Card 1: Visa -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-red-500">
+                    <div class="text-2xl mb-3">🛂 ビザ・入国</div>
+                    <h3 class="font-bold text-lg mb-2">イラン & アゼルバイジャン</h3>
+                    <ul class="text-sm space-y-2 text-stone-600 list-disc pl-4">
+                        <li><strong>イラン:</strong> アライバルビザは不確実。事前E-Visa推奨。パスポートにイスラエルスタンプがある場合は入国不可。</li>
+                        <li><strong>アゼルバイジャン:</strong> 空港でアライバルビザ取得可（端末申請）。</li>
+                        <li><strong>その他:</strong> トルコ、ジョージアはビザ不要。</li>
+                    </ul>
+                </div>
+
+                <!-- Card 2: Flights -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
+                    <div class="text-2xl mb-3">✈️ 航空券の手配</div>
+                    <h3 class="font-bold text-lg mb-2">テヘラン→バクーの確保</h3>
+                    <ul class="text-sm space-y-2 text-stone-600 list-disc pl-4">
+                        <li>この区間は便数が少ないため、<strong>最優先で予約</strong>すること。</li>
+                        <li>テヘラン発の陸路は時間がかかりすぎるため不可。</li>
+                        <li>イスタンブールの空港間違いに注意 (IST vs SAW)。移動に2時間かかります。</li>
+                    </ul>
+                </div>
+
+                <!-- Card 3: Money & Apps -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-yellow-500">
+                    <div class="text-2xl mb-3">💵 お金とアプリ</div>
+                    <h3 class="font-bold text-lg mb-2">イランでの決済</h3>
+                    <ul class="text-sm space-y-2 text-stone-600 list-disc pl-4">
+                        <li><strong>クレカ不可:</strong> イランではVISA/Master等は使えません。全額現金（USD/EUR）を持参。</li>
+                        <li><strong>配車アプリ:</strong> Snapp! (イラン), Bolt (その他), BiTaksi (トルコ) をインストール。</li>
+                        <li>現地SIMの確保が必須です。</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-stone-900 text-stone-400 py-8 text-center text-sm">
+        <div class="max-w-6xl mx-auto px-4">
+            <p class="mb-2">Travel Plan Generated based on Source Report</p>
+            <p>Route: TYO - IST - IKA - GYD - TBS - IST - BUD - CA720</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- Data Storage ---
+        const tripData = [
+            {
+                day: 1,
+                date: "2/4 (火)",
+                title: "日本出国・移動",
+                location: "東京 ➔ イスタンブール ➔ テヘラン",
+                icon: "🛫",
+                color: "bg-blue-100 text-blue-800",
+                details: [
+                    { time: "午前", text: "羽田空港発 (ANA NH219便など)" },
+                    { time: "17:00頃", text: "イスタンブール(IST)着。入国せず乗り継ぎへ。" },
+                    { time: "深夜", text: "イスタンブール発 ➔ テヘラン(IKA)へ。Turkish Airlines推奨。" },
+                    { time: "宿泊", text: "機内泊 または 深夜着後ホテル" }
+                ],
+                stats: { travel: 14, activity: 0 } // Hours estimated
+            },
+            {
+                day: 2,
+                date: "2/5 (水)",
+                title: "ペルシャの都 テヘラン",
+                location: "テヘラン (イラン)",
+                icon: "🕌",
+                color: "bg-green-100 text-green-800",
+                details: [
+                    { time: "早朝", text: "テヘラン(IKA)着。アライバルビザ取得、両替、SIM調達。" },
+                    { time: "午前", text: "ホテルで仮眠・休憩。" },
+                    { time: "午後", text: "ゴレスターン宮殿（世界遺産）、テヘラン・バザール、国立博物館。" },
+                    { time: "宿泊", text: "テヘラン市内" }
+                ],
+                stats: { travel: 2, activity: 6 }
+            },
+            {
+                day: 3,
+                date: "2/6 (木)",
+                title: "テヘラン観光 ➔ カスピ海へ",
+                location: "テヘラン ➔ バクー",
+                icon: "✈️",
+                color: "bg-green-100 text-green-800",
+                details: [
+                    { time: "日中", text: "旧アメリカ大使館、タビアト橋など観光。" },
+                    { time: "夕方/夜", text: "テヘラン(IKA)発 ➔ バクー(GYD)着。Azerbaijan Airlinesなど。" },
+                    { time: "注意", text: "このフライト確保が最重要。" },
+                    { time: "宿泊", text: "バクー市内" }
+                ],
+                stats: { travel: 4, activity: 5 }
+            },
+            {
+                day: 4,
+                date: "2/7 (金)",
+                title: "炎の国 アゼルバイジャン",
+                location: "バクー (アゼルバイジャン)",
+                icon: "🔥",
+                color: "bg-indigo-100 text-indigo-800",
+                details: [
+                    { time: "終日", text: "バクー市内観光" },
+                    { time: "Spot 1", text: "旧市街（乙女の塔、シルヴァン・シャー宮殿）" },
+                    { time: "Spot 2", text: "ヘイダル・アリエフ・センター（ザハ・ハディド建築）" },
+                    { time: "夜", text: "フレームタワーズの夜景観賞" }
+                ],
+                stats: { travel: 0, activity: 10 }
+            },
+            {
+                day: 5,
+                date: "2/8 (土)",
+                title: "コーカサスの古都へ",
+                location: "バクー ➔ トビリシ",
+                icon: "🍷",
+                color: "bg-red-100 text-red-800",
+                details: [
+                    { time: "午前", text: "バクー(GYD)発 ➔ トビリシ(TBS)着。飛行機移動推奨。" },
+                    { time: "午後", text: "トビリシ旧市街観光。ナリカラ砦（ロープウェイ）、硫黄温泉街。" },
+                    { time: "食事", text: "ヒンカリ、ハチャプリ、ジョージアワインを楽しむ。" },
+                    { time: "宿泊", text: "トビリシ市内" }
+                ],
+                stats: { travel: 3, activity: 6 }
+            },
+            {
+                day: 6,
+                date: "2/9 (日)",
+                title: "ジョージアの絶景・郊外",
+                location: "トビリシ周辺",
+                icon: "⛰️",
+                color: "bg-red-100 text-red-800",
+                details: [
+                    { time: "選択肢1", text: "ムツヘタ（古都・世界遺産）まで車で30分。" },
+                    { time: "選択肢2", text: "カズベキ（ステパンツミンダ）日帰りツアー（絶景教会）。" },
+                    { time: "選択肢3", text: "市内でのんびり（ドライ・ブリッジ市場など）。" },
+                    { time: "宿泊", text: "トビリシ市内" }
+                ],
+                stats: { travel: 2, activity: 8 }
+            },
+            {
+                day: 7,
+                date: "2/10 (月)",
+                title: "帝都イスタンブールへ",
+                location: "トビリシ ➔ イスタンブール",
+                icon: "🌉",
+                color: "bg-orange-100 text-orange-800",
+                details: [
+                    { time: "午前", text: "トビリシ(TBS)発 ➔ イスタンブール(IST/SAW)着。" },
+                    { time: "午後", text: "ホテルチェックイン。旧市街（アヤソフィア周辺）へ直行。" },
+                    { time: "夕方", text: "ブルーモスク、地下宮殿など。" },
+                    { time: "宿泊", text: "イスタンブール" }
+                ],
+                stats: { travel: 5, activity: 5 }
+            },
+            {
+                day: 8,
+                date: "2/11 (火)",
+                title: "イスタンブール満喫",
+                location: "イスタンブール (旧市街/新市街)",
+                icon: "🕌",
+                color: "bg-orange-100 text-orange-800",
+                details: [
+                    { time: "午前", text: "トプカプ宮殿（ハレム含む）。" },
+                    { time: "午後", text: "グランドバザール、エジプシャンバザールでお土産探し。" },
+                    { time: "夕方", text: "ガラタ橋を渡り、新市街・カラキョイ地区へ。" },
+                    { time: "夜", text: "ボスポラス海峡沿いで夕食。" }
+                ],
+                stats: { travel: 0, activity: 10 }
+            },
+            {
+                day: 9,
+                date: "2/12 (水)",
+                title: "ドナウの真珠へ移動",
+                location: "イスタンブール ➔ ブダペスト",
+                icon: "🏰",
+                color: "bg-emerald-100 text-emerald-800",
+                details: [
+                    { time: "午前", text: "イスタンブール発 ➔ ブダペスト(BUD)着 (TK/Wizz Air等)。" },
+                    { time: "午後", text: "ブダペスト到着。くさり橋、ドナウ川遊歩道を散策。" },
+                    { time: "夜", text: "ドナウ川ナイトクルーズ（国会議事堂の夜景）。" },
+                    { time: "宿泊", text: "ブダペスト市内" }
+                ],
+                stats: { travel: 4, activity: 5 }
+            },
+            {
+                day: 10,
+                date: "2/13 (木)",
+                title: "ブダペスト歴史探訪",
+                location: "ブダペスト (王宮の丘)",
+                icon: "👑",
+                color: "bg-emerald-100 text-emerald-800",
+                details: [
+                    { time: "午前", text: "王宮の丘へ（ケーブルカー利用）。マーチャーシュ教会、漁夫の砦。" },
+                    { time: "午後", text: "ペスト側へ。聖イシュトヴァーン大聖堂、アンドラーシ通り。" },
+                    { time: "夜", text: "廃墟バー（Ruin Bar）でハンガリーの夜を体験。" },
+                    { time: "宿泊", text: "ブダペスト市内" }
+                ],
+                stats: { travel: 0, activity: 9 }
+            },
+            {
+                day: 11,
+                date: "2/14 (金)",
+                title: "温泉と市場",
+                location: "ブダペスト",
+                icon: "♨️",
+                color: "bg-emerald-100 text-emerald-800",
+                details: [
+                    { time: "午前", text: "中央市場でフォアグラやパプリカパウダーなどお土産購入。" },
+                    { time: "午後", text: "セーチェーニ温泉で旅の疲れを癒やす。" },
+                    { time: "夜", text: "最後の晩餐（グヤーシュなどのハンガリー料理）。" }
+                ],
+                stats: { travel: 1, activity: 7 }
+            },
+            {
+                day: 12,
+                date: "2/15 (土)",
+                title: "CA720便で帰国",
+                location: "ブダペスト ➔ 北京経由 ➔ 東京",
+                icon: "🛫",
+                color: "bg-stone-200 text-stone-600",
+                details: [
+                    { time: "午前", text: "ホテルチェックアウト。リスト・フェレンツ国際空港(BUD)へ。" },
+                    { time: "12:00頃", text: "CA720 (Air China) 出発。北京経由で日本へ。" },
+                    { time: "備考", text: "お気をつけてお帰りください。" }
+                ],
+                stats: { travel: 12, activity: 0 }
+            }
+        ];
+
+        // --- Core Interactions ---
+        
+        let activeDayId = 1;
+
+        function renderDayList() {
+            const listContainer = document.getElementById('day-list');
+            listContainer.innerHTML = '';
+
+            tripData.forEach(day => {
+                const btn = document.createElement('button');
+                const isActive = day.day === activeDayId;
+                
+                btn.className = `
+                    w-full text-left p-4 rounded-lg transition-all duration-200 flex items-center gap-3 border-l-4
+                    ${isActive ? 'bg-orange-50 border-orange-500 shadow-md' : 'bg-white border-transparent hover:bg-stone-50'}
+                `;
+                btn.onclick = () => {
+                    activeDayId = day.day;
+                    renderDayList();
+                    renderDetailPanel();
+                };
+
+                btn.innerHTML = `
+                    <div class="font-bold text-lg min-w-[3rem] ${isActive ? 'text-orange-600' : 'text-stone-400'}">Day ${day.day}</div>
+                    <div>
+                        <div class="text-xs font-bold text-stone-500 uppercase tracking-wide">${day.date}</div>
+                        <div class="font-semibold text-stone-800 text-sm md:text-base truncate">${day.location}</div>
+                    </div>
+                `;
+                listContainer.appendChild(btn);
+            });
+        }
+
+        function renderDetailPanel() {
+            const day = tripData.find(d => d.day === activeDayId);
+            const panel = document.getElementById('detail-content');
+            
+            // Reset animation
+            panel.classList.remove('fade-in');
+            void panel.offsetWidth; // trigger reflow
+            panel.classList.add('fade-in');
+
+            let html = `
+                <div class="flex items-start justify-between mb-6">
+                    <div>
+                        <span class="inline-block px-3 py-1 rounded-full text-xs font-bold mb-2 ${day.color.split(' ')[0]} ${day.color.split(' ')[1]}">
+                            ${day.date}
+                        </span>
+                        <h2 class="text-3xl font-bold text-stone-800">${day.title}</h2>
+                        <div class="flex items-center text-stone-500 mt-2">
+                            <span class="mr-2 text-xl">${day.icon}</span>
+                            <span class="font-medium">${day.location}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+            `;
+
+            day.details.forEach((item, index) => {
+                html += `
+                    <div class="flex group">
+                        <div class="flex flex-col items-center mr-4">
+                            <div class="w-3 h-3 bg-orange-400 rounded-full mt-2 ring-4 ring-white"></div>
+                            ${index !== day.details.length - 1 ? '<div class="w-0.5 h-full bg-stone-200 my-1"></div>' : ''}
+                        </div>
+                        <div class="bg-white p-4 rounded-lg shadow-sm border border-stone-100 flex-1 hover:border-orange-200 transition-colors">
+                            <div class="text-xs font-bold text-orange-600 uppercase mb-1">${item.time}</div>
+                            <div class="text-stone-700 leading-relaxed">${item.text}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            
+            // Add visual cue for flights if relevant
+            if(day.title.includes("移動") || day.location.includes("➔")) {
+                html += `
+                    <div class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800 flex items-start">
+                        <span class="text-xl mr-3">✈️</span>
+                        <div>
+                            <span class="font-bold">フライト情報:</span> 
+                            予約便の時間、ターミナル(IST/SAW)、ビザ要件を必ず再確認してください。
+                        </div>
+                    </div>
+                `;
+            }
+
+            panel.innerHTML = html;
+        }
+
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('mobile-menu').classList.add('hidden');
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+
+        // --- Chart Generation ---
+        function initCharts() {
+            // Data Prep
+            const countryLabels = ["移動", "イラン", "アゼルバイジャン", "ジョージア", "トルコ", "ハンガリー"];
+            // Approx days: Day1(Move), Day2-3(Iran), Day3-5(Azer), Day5-7(Geo), Day7-9(Turk), Day9-12(Hun)
+            // Recalculated for new plan
+            const countryData = [1.5, 1.5, 1.5, 2, 2.5, 3]; 
+            const countryColors = ['#94a3b8', '#166534', '#4338ca', '#991b1b', '#ea580c', '#059669'];
+
+            // Chart 1: Country Distribution
+            const ctx1 = document.getElementById('countryChart').getContext('2d');
+            new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: countryLabels,
+                    datasets: [{
+                        data: countryData,
+                        backgroundColor: countryColors,
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+
+            // Chart 2: Activity Intensity
+            const ctx2 = document.getElementById('intensityChart').getContext('2d');
+            new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: tripData.map(d => `Day ${d.day}`),
+                    datasets: [
+                        {
+                            label: '移動負荷 (時間)',
+                            data: tripData.map(d => d.stats.travel),
+                            backgroundColor: '#94a3b8', // Slate for travel
+                            borderRadius: 4,
+                            stack: 'Stack 0',
+                        },
+                        {
+                            label: '観光・活動 (時間)',
+                            data: tripData.map(d => d.stats.activity),
+                            backgroundColor: '#fb923c', // Orange for fun
+                            borderRadius: 4,
+                            stack: 'Stack 0',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, grid: { display: false } },
+                        y: { stacked: true, beginAtZero: true, max: 16 }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const idx = items[0].dataIndex;
+                                    return `${tripData[idx].date} - ${tripData[idx].location}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderDayList();
+            renderDetailPanel();
+            initCharts();
+        });
+
+    </script>
+</body>
+</html>
